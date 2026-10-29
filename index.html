@@ -1,0 +1,342 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#176534">
+<title>Crop Shree Life Science</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f2f7f2;color:#183322}
+header{background:#176534;color:white;text-align:center;padding:24px 12px}
+header h2{margin:0;cursor:pointer}
+header p{margin:8px 0 0;font-size:14px}
+.container{max-width:700px;margin:25px auto;padding:16px}
+.card{background:white;padding:24px;border-radius:14px;box-shadow:0 4px 18px #0001}
+h3{margin-top:0}
+label{display:block;margin:16px 0 7px;font-weight:bold}
+input{width:100%;padding:13px;border:1px solid #ccd7cc;border-radius:7px;font-size:15px}
+button{border:0;border-radius:7px;padding:12px 16px;background:#176534;color:white;font-size:15px;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}
+.submit{width:100%;margin-top:20px}
+.secondary{background:#52645a}
+.hidden{display:none!important}
+#message,#loginMessage,#adminMessage{margin-top:15px;font-size:14px;overflow-wrap:anywhere}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}
+.toolbar button{flex:1}
+.table-wrap{overflow:auto;margin-top:18px;border-radius:8px}
+table{width:100%;border-collapse:collapse;background:white;min-width:650px}
+th,td{padding:12px;border:1px solid #ddd;text-align:left;font-size:13px}
+th{background:#176534;color:white}
+footer{text-align:center;padding:20px;color:#66766b;font-size:12px}
+.notice{background:#fff8e6;border:1px solid #e7d39d;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;margin-top:15px}
+</style>
+</head>
+
+<body>
+<header>
+  <h2 id="companyTitle">Crop Shree Life Science</h2>
+  <p>Farmer Registration Portal</p>
+</header>
+
+<main class="container">
+
+<section class="card" id="registration">
+  <h3>Farmer Registration</h3>
+  <p>Enter the farmer's details below.</p>
+
+  <form id="farmerForm">
+    <label for="name">Farmer Name</label>
+    <input id="name" required maxlength="100"
+           placeholder="Enter farmer name" autocomplete="name">
+
+    <label for="village">Village Name</label>
+    <input id="village" required maxlength="100"
+           placeholder="Enter village name">
+
+    <label for="mobile">Mobile Number</label>
+    <input id="mobile" type="tel" required inputmode="numeric"
+           pattern="[0-9]{10}" maxlength="10"
+           placeholder="Enter 10-digit mobile number">
+
+    <button class="submit" id="submitBtn" type="submit">
+      Submit Details
+    </button>
+  </form>
+  <div id="message" role="status" aria-live="polite"></div>
+</section>
+
+<section class="card hidden" id="adminLogin">
+  <h3>Admin Access</h3>
+  <form id="loginForm">
+    <label for="password">Admin Password</label>
+    <input id="password" type="password" required
+           placeholder="Enter admin password" autocomplete="current-password">
+    <button class="submit" type="submit">Open Dashboard</button>
+    <button class="submit secondary" id="cancelLogin" type="button">Cancel</button>
+  </form>
+  <div id="loginMessage" role="status"></div>
+</section>
+
+<section class="hidden" id="dashboard">
+  <div class="card">
+    <h3>Farmer Records</h3>
+    <p id="recordCount">Loading records...</p>
+
+    <div class="toolbar">
+      <button id="refreshBtn" type="button">Refresh</button>
+      <button id="exportBtn" type="button">Export CSV</button>
+      <button class="secondary" id="logoutBtn" type="button">Logout</button>
+    </div>
+
+    <div class="notice">
+      Testing version: the password in this HTML is not secure database
+      authentication. Use only dummy records until proper access controls
+      are configured.
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Serial No.</th>
+          <th>Date</th>
+          <th>Name</th>
+          <th>Village Name</th>
+          <th>Mobile No.</th>
+        </tr>
+      </thead>
+      <tbody id="recordsBody">
+        <tr><td colspan="5">No records loaded.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="adminMessage" role="status"></div>
+</section>
+
+</main>
+
+<footer>Crop Shree Life Science &copy; 2026</footer>
+
+<!-- Firebase compatibility SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAI5nH5aEx4HrwKFnR1iOiQnFcYKcAqmeA",
+  authDomain: "crop-shree-life-science.firebaseapp.com",
+  databaseURL: "https://crop-shree-life-science-default-rtdb.firebaseio.com",
+  projectId: "crop-shree-life-science",
+  storageBucket: "crop-shree-life-science.firebasestorage.app",
+  messagingSenderId: "531283073263",
+  appId: "1:531283073263:web:44978107f1ba5e8e64a31a",
+  measurementId: "G-JXRKKRNQ4K"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const farmersRef = db.ref("farmers");
+
+// DEMO ONLY: anyone can discover this password in the page source.
+// Replace this approach with Firebase Authentication for real data.
+const ADMIN_PASSWORD = "865888";
+
+const $ = id => document.getElementById(id);
+
+let titleTaps = 0;
+let tapTimer;
+let adminOpen = false;
+let records = [];
+
+function show(element) {
+  $(element).classList.remove("hidden");
+}
+
+function hide(element) {
+  $(element).classList.add("hidden");
+}
+
+// Tap the company title seven times to display the password popup.
+$("companyTitle").addEventListener("click", () => {
+  titleTaps++;
+  clearTimeout(tapTimer);
+
+  tapTimer = setTimeout(() => {
+    titleTaps = 0;
+  }, 2000);
+
+  if (titleTaps >= 7) {
+    titleTaps = 0;
+    hide("registration");
+    hide("dashboard");
+    show("adminLogin");
+    $("loginMessage").textContent = "";
+    $("password").value = "";
+    $("password").focus();
+  }
+});
+
+$("cancelLogin").addEventListener("click", () => {
+  hide("adminLogin");
+  show("registration");
+});
+
+// Save farmer details to Firebase Realtime Database.
+$("farmerForm").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const name = $("name").value.trim();
+  const village = $("village").value.trim();
+  const mobile = $("mobile").value.trim();
+
+  if (!name || !village || !/^[0-9]{10}$/.test(mobile)) {
+    $("message").textContent =
+      "Please enter a valid name, village and 10-digit mobile number.";
+    return;
+  }
+
+  $("submitBtn").disabled = true;
+  $("message").textContent = "Submitting details...";
+
+  try {
+    await farmersRef.push({
+      name: name,
+      village: village,
+      mobile: mobile,
+      createdAt: firebase.database.ServerValue.TIMESTAMP
+    });
+
+    $("farmerForm").reset();
+    $("message").textContent = "Farmer registered successfully!";
+  } catch (error) {
+    console.error("Firebase submission error:", error);
+    $("message").textContent =
+      "Submission failed. Check your internet connection and Firebase Database rules.";
+  } finally {
+    $("submitBtn").disabled = false;
+  }
+});
+
+// Demo password check. This does not secure the database.
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  if ($("password").value !== ADMIN_PASSWORD) {
+    $("loginMessage").textContent = "Incorrect password.";
+    return;
+  }
+
+  adminOpen = true;
+  hide("adminLogin");
+  show("dashboard");
+  await loadRecords();
+});
+
+// Retrieve all records from Realtime Database.
+async function loadRecords() {
+  if (!adminOpen) return;
+
+  $("recordCount").textContent = "Loading records...";
+  $("adminMessage").textContent = "";
+  $("recordsBody").replaceChildren();
+
+  try {
+    const snapshot = await farmersRef.get();
+    const data = snapshot.val() || {};
+
+    records = Object.entries(data)
+      .map(([id, record]) => ({ id, ...record }))
+      .sort((a, b) => (Number(b.createdAt) || 0) -
+                      (Number(a.createdAt) || 0));
+
+    $("recordCount").textContent =
+      "Total registered farmers: " + records.length;
+
+    if (records.length === 0) {
+      $("recordsBody").innerHTML =
+        '<tr><td colspan="5">No farmer records found.</td></tr>';
+      return;
+    }
+
+    records.forEach((record, index) => {
+      const tr = document.createElement("tr");
+
+      const date = Number(record.createdAt)
+        ? new Date(Number(record.createdAt)).toLocaleString("en-IN")
+        : "Pending";
+
+      [
+        records.length - index,
+        date,
+        record.name || "",
+        record.village || "",
+        record.mobile || ""
+      ].forEach(value => {
+        const td = document.createElement("td");
+        td.textContent = String(value);
+        tr.appendChild(td);
+      });
+
+      $("recordsBody").appendChild(tr);
+    });
+  } catch (error) {
+    console.error("Firebase read error:", error);
+    $("recordCount").textContent = "Could not load records.";
+    $("recordsBody").innerHTML =
+      '<tr><td colspan="5">Access denied or database unavailable. Check Firebase Database rules.</td></tr>';
+  }
+}
+
+$("refreshBtn").addEventListener("click", loadRecords);
+
+$("logoutBtn").addEventListener("click", () => {
+  adminOpen = false;
+  records = [];
+  hide("dashboard");
+  show("registration");
+  $("password").value = "";
+});
+
+// Export displayed farmer records to a CSV file.
+$("exportBtn").addEventListener("click", () => {
+  if (!adminOpen) return;
+
+  const csvCell = value =>
+    '"' + String(value ?? "").replace(/"/g, '""') + '"';
+
+  const rows = [
+    ["Serial No.", "Date", "Name", "Village Name", "Mobile No."],
+    ...records.map((record, index) => [
+      records.length - index,
+      Number(record.createdAt)
+        ? new Date(Number(record.createdAt)).toLocaleString("en-IN")
+        : "Pending",
+      record.name || "",
+      record.village || "",
+      record.mobile || ""
+    ])
+  ];
+
+  const csv = "\uFEFF" +
+    rows.map(row => row.map(csvCell).join(",")).join("\r\n");
+
+  const url = URL.createObjectURL(
+    new Blob([csv], { type: "text/csv;charset=utf-8;" })
+  );
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "crop-shree-farmer-records.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
